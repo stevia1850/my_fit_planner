@@ -19,47 +19,79 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    html, body, [class*="css"], [data-testid="stAppViewContainer"], .stMarkdown, p, div, span, label {
+        font-family: Pretendard, "Apple SD Gothic Neo", sans-serif !important;
+    }
     [data-testid="stSidebar"],
     [data-testid="stSidebarCollapsedControl"],
-    [data-testid="collapsedControl"] {
-        display: none !important;
+    [data-testid="collapsedControl"] { display: none !important; }
+    header[data-testid="stHeader"] { pointer-events: none !important; background: transparent !important; }
+    header[data-testid="stHeader"] * { pointer-events: none !important; }
+    [data-testid="stAppViewContainer"] {
+        background: radial-gradient(1200px 500px at 10% -10%, #e7eee6 0%, #f3efe6 42%, #efe8dc 100%);
     }
-    header[data-testid="stHeader"] {
-        pointer-events: none !important;
-        background: transparent !important;
+    .block-container { padding-top: 2.2rem; padding-bottom: 3.4rem; max-width: 820px; }
+    h1 { font-size: 1.55rem !important; font-weight: 750 !important; letter-spacing: -0.04em; color: #1f2a24 !important; }
+    h2, h3 { color: #24302a !important; letter-spacing: -0.03em; }
+    .hint { color: #6b736e; font-size: 0.9rem; margin-bottom: 0.9rem; }
+    div[data-testid="stMetric"] {
+        background: #fffdf8;
+        border: 1px solid #eadfce;
+        border-radius: 16px;
+        padding: 0.7rem 0.8rem;
+        box-shadow: 0 8px 24px rgba(60, 47, 30, 0.04);
     }
-    header[data-testid="stHeader"] * {
-        pointer-events: none !important;
+    div[data-testid="stMetricValue"] { font-size: 1.28rem; color: #1f2a24; }
+    div[data-testid="stMetricLabel"] { color: #6b736e; }
+    .stButton>button {
+        border-radius: 12px;
+        height: 2.7rem;
+        font-weight: 650;
+        border: 1px solid #d7cbb8;
     }
-    .block-container { padding-top: 2.4rem; padding-bottom: 3rem; max-width: 860px; }
-    h1 { font-size: 1.3rem !important; }
-    .hint { color: #667085; font-size: 0.86rem; margin-bottom: 0.8rem; }
+    .stButton>button[kind="primary"] {
+        background: #2f4a3c;
+        border-color: #2f4a3c;
+        color: #fff;
+    }
     .brick {
-        background: #f8fafc;
-        border: 1px solid #e4e7ec;
-        border-radius: 14px;
-        padding: 0.85rem 0.9rem 0.35rem;
-        margin-bottom: 0.8rem;
+        background: #fffdf8;
+        border: 1px solid #eadfce;
+        border-radius: 18px;
+        padding: 0.95rem 1rem 0.45rem;
+        margin-bottom: 0.9rem;
+        box-shadow: 0 10px 28px rgba(60, 47, 30, 0.05);
     }
-    .brick-sub { color: #667085; font-size: 0.8rem; margin: 0.15rem 0 0.4rem; }
-    .prev { color: #344054; font-size: 0.8rem; margin-bottom: 0.35rem; }
-    .cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .cal th { font-size: 0.75rem; color: #667085; padding: 0.25rem; }
+    .brick-sub { color: #6b736e; font-size: 0.82rem; margin: 0.2rem 0 0.45rem; }
+    .prev {
+        display: inline-block;
+        background: #eef3ee;
+        color: #2f4a3c;
+        border-radius: 999px;
+        padding: 0.18rem 0.6rem;
+        font-size: 0.78rem;
+        margin: 0 0.25rem 0.45rem 0;
+    }
+    .cal { width: 100%; border-collapse: separate; border-spacing: 6px; table-layout: fixed; }
+    .cal th { font-size: 0.75rem; color: #6b736e; padding: 0.2rem; font-weight: 600; }
     .cal td {
-        vertical-align: top; height: 72px; border: 1px solid #eef0f3;
-        border-radius: 8px; padding: 0.28rem; font-size: 0.72rem;
+        vertical-align: top; height: 78px; background: #fffdf8;
+        border: 1px solid #eadfce; border-radius: 12px; padding: 0.4rem; font-size: 0.72rem;
     }
-    .cal .num { font-weight: 700; font-size: 0.8rem; }
-    .cal .today { background: #eff8ff; border-color: #84caff; }
-    .cal .done { background: #ecfdf3; }
-    .cal .plan { color: #344054; }
-    .weekbox { display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.4rem; }
+    .cal .num { font-weight: 750; font-size: 0.84rem; color: #1f2a24; }
+    .cal .today { background: #e8f0ea; border-color: #2f4a3c; }
+    .cal .done { background: #f3ead6; }
+    .cal .plan { color: #5c6560; }
+    .weekbox { display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.15rem 0 0.6rem; }
     .wday {
-        min-width: 92px; flex: 1; background: #f8fafc; border: 1px solid #e4e7ec;
-        border-radius: 12px; padding: 0.55rem 0.5rem;
+        min-width: 96px; flex: 1; background: #fffdf8; border: 1px solid #eadfce;
+        border-radius: 16px; padding: 0.65rem 0.55rem; box-shadow: 0 8px 20px rgba(60,47,30,0.04);
     }
-    .wday.on { background: #eff8ff; border-color: #84caff; }
-    .wday.ok { background: #ecfdf3; }
+    .wday.on { background: #e8f0ea; border-color: #2f4a3c; }
+    .wday.ok { background: #f3ead6; }
+    .stExpander { background: #fffdf8; border-radius: 14px !important; }
+    [data-testid="stAlert"] { border-radius: 14px; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -110,6 +142,41 @@ MEALS = {
 }
 WARMUP_IDS = {"arm_circle", "scapular_pushup", "band_er", "face_pull_wu"}
 
+# 67kg / 체지방 22% / 어깨 주의 기준 시작 추천
+RX = {
+    "arm_circle": {"n": 2, "w": [0, 0], "r": [15, 15], "txt": "2세트 × 15회 (맨몸)"},
+    "scapular_pushup": {"n": 2, "w": [0, 0], "r": [12, 12], "txt": "2세트 × 12회 (맨몸)"},
+    "band_er": {"n": 2, "w": [0, 0], "r": [15, 15], "txt": "2세트 × 15회 · 가벼운 밴드"},
+    "face_pull_wu": {"n": 2, "w": [7.5, 7.5], "r": [15, 15], "txt": "2세트 7.5kg × 15회"},
+    "leg_press": {"n": 3, "w": [60, 70, 80], "r": [12, 10, 10], "txt": "60×12 → 70×10 → 80×10"},
+    "squat_machine": {"n": 3, "w": [40, 45, 50], "r": [10, 10, 8], "txt": "40×10 → 45×10 → 50×8"},
+    "rdl": {"n": 3, "w": [30, 35, 40], "r": [10, 10, 8], "txt": "30×10 → 35×10 → 40×8"},
+    "leg_extension": {"n": 3, "w": [25, 30, 35], "r": [12, 12, 10], "txt": "25×12 → 30×12 → 35×10"},
+    "leg_curl": {"n": 3, "w": [20, 25, 30], "r": [12, 12, 10], "txt": "20×12 → 25×12 → 30×10"},
+    "dumbbell_lunge": {"n": 3, "w": [8, 8, 10], "r": [10, 10, 8], "txt": "양손 8~10kg × 10회"},
+    "calf_raise": {"n": 3, "w": [20, 25, 25], "r": [15, 15, 12], "txt": "20~25kg × 12~15회"},
+    "bench_press": {"n": 3, "w": [30, 35, 35], "r": [8, 8, 6], "txt": "30×8 → 35×8 · 어깨 주의"},
+    "incline_dumbbell_press": {"n": 3, "w": [12, 14, 14], "r": [10, 10, 8], "txt": "덤벨 12~14kg × 8~10회"},
+    "pec_deck": {"n": 3, "w": [20, 25, 25], "r": [12, 12, 10], "txt": "20~25kg × 10~12회"},
+    "shoulder_press_machine": {"n": 3, "w": [15, 20, 20], "r": [10, 8, 8], "txt": "15~20kg × 8~10회 · 어깨 주의"},
+    "ohp_machine": {"n": 3, "w": [15, 15, 20], "r": [10, 8, 8], "txt": "15~20kg × 8~10회 · 어깨 주의"},
+    "lateral_raise": {"n": 3, "w": [4, 5, 5], "r": [12, 12, 10], "txt": "덤벨 4~5kg × 10~12회"},
+    "dips": {"n": 3, "w": [0, 0, 0], "r": [6, 6, 6], "txt": "맨몸 6회 · 깊게 내려가지 말 것"},
+    "pushup": {"n": 3, "w": [0, 0, 0], "r": [10, 10, 8], "txt": "3세트 × 8~10회"},
+    "lat_pulldown": {"n": 3, "w": [30, 35, 40], "r": [10, 10, 8], "txt": "30×10 → 35×10 → 40×8"},
+    "pullup": {"n": 3, "w": [0, 0, 0], "r": [4, 4, 3], "txt": "3~5회 · 안 되면 랫풀다운"},
+    "seated_row": {"n": 3, "w": [30, 35, 40], "r": [10, 10, 8], "txt": "30×10 → 35×10 → 40×8"},
+    "dumbbell_row": {"n": 3, "w": [12, 14, 16], "r": [10, 10, 8], "txt": "12~16kg × 8~10회"},
+    "face_pull": {"n": 3, "w": [10, 12.5, 12.5], "r": [15, 12, 12], "txt": "10~12.5kg × 12~15회"},
+    "bicep_curl": {"n": 3, "w": [8, 8, 10], "r": [12, 10, 10], "txt": "8~10kg × 10~12회"},
+    "treadmill_walk": {"n": 1, "w": [0], "r": [20], "txt": "경사 6~8% · 5.5km/h · 20분"},
+    "treadmill": {"n": 1, "w": [0], "r": [12], "txt": "가벼운 조깅 10~12분"},
+    "stair_climber": {"n": 1, "w": [0], "r": [12], "txt": "12분 · 손 힘 빼기"},
+    "rowing": {"n": 1, "w": [0], "r": [10], "txt": "10분 · 다리-등-팔 순서"},
+    "plank": {"n": 3, "w": [0, 0, 0], "r": [30, 30, 40], "txt": "30~40초 3세트"},
+    "dead_bug": {"n": 3, "w": [0, 0, 0], "r": [10, 10, 10], "txt": "좌우 10회 3세트"},
+}
+
 
 def load_json(path, default=None):
     if default is None:
@@ -134,6 +201,8 @@ if "profile" not in st.session_state:
         st.session_state.profile.setdefault(k, v)
 if "diet_text" not in st.session_state:
     st.session_state.diet_text = ""
+if "diet_edit" not in st.session_state:
+    st.session_state.diet_edit = None
 
 p = st.session_state.profile
 
@@ -203,24 +272,30 @@ def analyze_week():
 def render_ex(ex, prefix):
     prev = last_detail(ex["name"])
     prev_sets = (prev or {}).get("set_logs") or []
-    default_n = min(6, max(1, len(prev_sets) or 3))
+    rx = RX.get(ex["id"], {"n": 3, "w": [0, 0, 0], "r": [10, 10, 10], "txt": "3세트 × 10회"})
+    default_n = min(6, max(1, len(prev_sets) or rx["n"]))
     st.markdown('<div class="brick">', unsafe_allow_html=True)
     done = st.checkbox(
         ex["name"] + ("  ·어깨주의" if not ex.get("shoulder_safe", True) else ""),
         key=f"{prefix}_on_{ex['id']}",
     )
     st.markdown(f'<div class="brick-sub">{ex["equipment"]} · {ex["muscles"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="prev">추천 {rx["txt"]}</div>', unsafe_allow_html=True)
     prev_txt = format_prev(prev)
     if prev_txt:
-        st.markdown(f'<div class="prev">{prev_txt}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="prev">{prev_txt} · 오늘은 같거나 2.5kg만 올리기</div>', unsafe_allow_html=True)
     with st.expander("방법"):
         st.write(ex["how_to"])
         st.caption(ex["tip"])
     n_sets = st.number_input("세트 수", 1, 6, default_n, key=f"{prefix}_n_{ex['id']}")
     set_logs = []
     for i in range(int(n_sets)):
-        pw = float(prev_sets[i]["weight"]) if i < len(prev_sets) else float((prev or {}).get("weight") or 0)
-        pr = int(prev_sets[i]["reps"]) if i < len(prev_sets) else int((prev or {}).get("reps") or 10)
+        if i < len(prev_sets):
+            pw = float(prev_sets[i].get("weight") or 0)
+            pr = int(prev_sets[i].get("reps") or 10)
+        else:
+            pw = float(rx["w"][i] if i < len(rx["w"]) else rx["w"][-1])
+            pr = int(rx["r"][i] if i < len(rx["r"]) else rx["r"][-1])
         c1, c2, c3 = st.columns([0.8, 1.2, 1.2])
         c1.markdown(f"**{i+1}세트**")
         w = c2.number_input("무게 kg", 0.0, 400.0, pw, 2.5, key=f"{prefix}_{ex['id']}_w{i}")
@@ -359,8 +434,8 @@ push_day = "밀기" in rec["title"]
 CUT_END = today + timedelta(weeks=8)
 CUT_TARGET = 18.0
 
-page = st.selectbox("화면", PAGES)
-st.caption("위 목록을 눌러 화면을 바꾸세요.")
+page = st.selectbox("메뉴", PAGES)
+st.caption("메뉴에서 화면을 고르면 됩니다.")
 
 if page == "오늘":
     st.title("오늘")
@@ -492,34 +567,93 @@ elif page == "몸":
 
 elif page == "식단":
     st.title("식단")
+    st.caption("음식을 쉼표로 나누세요. 예: 닭고기 슬라이스, 토마토, 밥")
     cols = st.columns(len(MEALS))
     for col, (label, text) in zip(cols, MEALS.items()):
         if col.button(label, use_container_width=True):
             st.session_state.diet_text = text
             st.rerun()
-    meal = st.selectbox("끼니", ["아침", "점심", "저녁", "간식"])
-    content = st.text_area("먹은 것", value=st.session_state.diet_text)
-    guess = estimate_meal(content) if str(content).strip() else {"kcal": 0, "protein": 0, "note": "적으면 대략 계산합니다."}
-    st.caption("추정 · " + guess["note"])
+
+    meals = ["아침", "점심", "저녁", "간식"]
+    default_meal = 0
+    if st.session_state.diet_edit:
+        ev = st.session_state.diet_edit
+        if ev.get("meal") in meals:
+            default_meal = meals.index(ev["meal"])
+    meal = st.selectbox("끼니", meals, index=default_meal)
+    content = st.text_area(
+        "먹은 것",
+        value=st.session_state.diet_text,
+        placeholder="닭고기 슬라이스, 토마토, 현미밥",
+        help="쉼표를 찍고 칸 밖을 한 번 누르면 합계가 갱신됩니다.",
+    )
+    st.session_state.diet_text = content
+    guess = estimate_meal(content)
+    g1, g2 = st.columns(2)
+    g1.metric("추정 단백질", f"{guess['protein']}g")
+    g2.metric("추정 칼로리", f"{guess['kcal']}kcal")
+    if guess.get("items"):
+        st.dataframe(
+            pd.DataFrame(
+                [{"음식": i["raw"], "인식": i["name"], "단백질": i["protein"], "칼로리": i["kcal"]} for i in guess["items"]]
+            ),
+            hide_index=True,
+            use_container_width=True,
+        )
+    st.caption(guess["note"])
     c1, c2 = st.columns(2)
-    protein = c1.number_input("단백질 g", 0, 250, int(guess["protein"]))
-    kcal = c2.number_input("칼로리 kcal", 0, 3000, int(guess["kcal"]))
-    if st.button("식단 저장", type="primary", use_container_width=True):
+    protein = c1.number_input("단백질 수정 g", 0, 250, int(guess["protein"]))
+    kcal = c2.number_input("칼로리 수정 kcal", 0, 3000, int(guess["kcal"]))
+    save_label = "수정 저장" if st.session_state.diet_edit else "식단 저장"
+    if st.button(save_label, type="primary", use_container_width=True):
         diet = load_json(DIET_FILE)
-        diet.append({"date": str(today), "meal": meal, "content": content, "protein": protein, "kcal": kcal, "timestamp": datetime.now().isoformat()})
+        if st.session_state.diet_edit:
+            ts = st.session_state.diet_edit.get("timestamp")
+            for row in diet:
+                if row.get("timestamp") == ts:
+                    row.update({"meal": meal, "content": content, "protein": protein, "kcal": kcal})
+                    break
+            st.session_state.diet_edit = None
+        else:
+            diet.append(
+                {
+                    "date": str(today),
+                    "meal": meal,
+                    "content": content,
+                    "protein": protein,
+                    "kcal": kcal,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
         save_json(DIET_FILE, diet)
         st.session_state.diet_text = ""
         st.success("저장했습니다.")
         st.rerun()
+    if st.session_state.diet_edit and st.button("수정 취소"):
+        st.session_state.diet_edit = None
+        st.session_state.diet_text = ""
+        st.rerun()
+
     diet = load_json(DIET_FILE)
-    today_diet = [d for d in diet if d["date"] == str(today)]
-    tp = sum(int(d.get("protein", 0) or 0) for d in today_diet)
-    tk = sum(int(d.get("kcal", 0) or 0) for d in today_diet)
+    view_day = st.date_input("기록 날짜", today)
+    day_diet = [d for d in diet if d.get("date") == str(view_day)]
+    tp = sum(int(d.get("protein", 0) or 0) for d in day_diet)
+    tk = sum(int(d.get("kcal", 0) or 0) for d in day_diet)
     m1, m2 = st.columns(2)
-    m1.metric("오늘 단백질", f"{tp}g / {int(p.get('protein_target', 120))}g")
-    m2.metric("오늘 칼로리", f"{tk}kcal / {int(p.get('kcal_target', 2000))}kcal")
-    for d in today_diet:
+    m1.metric("그날 단백질", f"{tp}g / {int(p.get('protein_target', 120))}g")
+    m2.metric("그날 칼로리", f"{tk}kcal / {int(p.get('kcal_target', 1800))}kcal")
+    if not day_diet:
+        st.info("이 날짜 식단이 없습니다.")
+    for d in day_diet:
         st.write(f"**{d['meal']}** · {d['content']} ({d.get('protein', 0)}g, {d.get('kcal', 0)}kcal)")
+        b1, b2 = st.columns(2)
+        if b1.button("수정", key="e_" + d.get("timestamp", d["content"])):
+            st.session_state.diet_edit = d
+            st.session_state.diet_text = d.get("content", "")
+            st.rerun()
+        if b2.button("삭제", key="x_" + d.get("timestamp", d["content"])):
+            save_json(DIET_FILE, [x for x in diet if x.get("timestamp") != d.get("timestamp")])
+            st.rerun()
 
 elif page == "도감":
     st.title("도감")
