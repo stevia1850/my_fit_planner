@@ -5,36 +5,42 @@ from datetime import date, datetime
 import pandas as pd
 import streamlit as st
 
-from exercises import EXERCISES, RECOMMENDED, get_all_exercises, get_exercise_by_id
+from exercises import EXERCISES, RECOMMENDED, get_exercise_by_id
+from food import estimate_meal
 
 st.set_page_config(
-    page_title="My Fit Planner",
+    page_title="My Fit",
     page_icon="💪",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
 st.markdown(
     """
 <style>
-    .main-header { font-size: 2rem; font-weight: 700; margin-bottom: 0.2rem; }
-    .sub-header { font-size: 1rem; color: #666; margin-bottom: 1.2rem; }
-    .muscle-tag {
-        display: inline-block; background: #eef2ff; color: #4f46e5;
-        padding: 0.2rem 0.65rem; border-radius: 16px; font-size: 0.8rem; margin-right: 0.3rem;
+    [data-testid="stSidebar"],
+    [data-testid="stSidebarNav"],
+    [data-testid="stSidebarContent"],
+    section[data-testid="stSidebar"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"],
+    button[kind="header"],
+    button[data-testid="baseButton-header"],
+    div[data-testid="stDecoration"] {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        visibility: hidden !important;
     }
-    .safe-tag {
-        display: inline-block; background: #ecfdf5; color: #059669;
-        padding: 0.2rem 0.65rem; border-radius: 16px; font-size: 0.8rem;
+    header[data-testid="stHeader"] {
+        background: transparent;
     }
-    .caution-tag {
-        display: inline-block; background: #fef3c7; color: #d97706;
-        padding: 0.2rem 0.65rem; border-radius: 16px; font-size: 0.8rem;
-    }
-    .feedback-box {
-        background: #f0f9ff; border-left: 4px solid #0ea5e9;
-        padding: 0.9rem 1.1rem; border-radius: 0 10px 10px 0; margin: 0.8rem 0;
-    }
+    .block-container { padding-top: 0.6rem; padding-bottom: 3.2rem; max-width: 740px; }
+    h1 { font-size: 1.35rem !important; margin-bottom: 0.2rem !important; }
+    h2, h3 { font-size: 1.02rem !important; }
+    div[data-testid="stMetricValue"] { font-size: 1.2rem; }
+    .hint { color: #667085; font-size: 0.86rem; margin: 0.15rem 0 0.7rem; }
+    .prev { color: #344054; font-size: 0.82rem; margin: 0 0 0.35rem; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -54,8 +60,50 @@ DEFAULT_PROFILE = {
     "weight": 67.0,
     "body_fat": 22.0,
     "goal_fat": 15.0,
-    "gender": "남성",
     "protein_target": 120,
+    "kcal_target": 2000,
+}
+WEEKDAY = ["월", "화", "수", "목", "금", "토", "일"]
+PARTS = ["하체", "가슴", "어깨", "등", "팔", "코어", "유산소"]
+ID_PARTS = {
+    "arm_circle": ["어깨"],
+    "scapular_pushup": ["어깨"],
+    "band_er": ["어깨"],
+    "face_pull_wu": ["어깨"],
+    "face_pull": ["어깨", "등"],
+    "leg_press": ["하체"],
+    "squat_machine": ["하체"],
+    "rdl": ["하체"],
+    "leg_extension": ["하체"],
+    "leg_curl": ["하체"],
+    "dumbbell_lunge": ["하체"],
+    "calf_raise": ["하체"],
+    "bench_press": ["가슴", "어깨", "팔"],
+    "incline_dumbbell_press": ["가슴", "어깨"],
+    "pec_deck": ["가슴"],
+    "shoulder_press_machine": ["어깨"],
+    "ohp_machine": ["어깨"],
+    "lateral_raise": ["어깨"],
+    "dips": ["가슴", "팔"],
+    "pushup": ["가슴", "팔", "코어"],
+    "lat_pulldown": ["등", "팔"],
+    "pullup": ["등", "팔"],
+    "seated_row": ["등"],
+    "dumbbell_row": ["등"],
+    "bicep_curl": ["팔"],
+    "treadmill": ["유산소"],
+    "treadmill_walk": ["유산소"],
+    "stair_climber": ["유산소", "하체"],
+    "rowing": ["유산소", "등"],
+    "plank": ["코어"],
+    "dead_bug": ["코어"],
+}
+MEALS = {
+    "닭가슴 + 밥 + 채소": "닭가슴살, 현미밥, 샐러드",
+    "계란 + 밥": "계란 2개, 밥, 김치",
+    "그릭요거트 + 과일": "그릭요거트, 바나나",
+    "프로틴": "프로틴 쉐이크",
+    "외식 한 끼": "덮밥",
 }
 
 
@@ -80,366 +128,346 @@ if "profile" not in st.session_state:
     st.session_state.profile = load_json(PROFILE_FILE, DEFAULT_PROFILE)
     for k, v in DEFAULT_PROFILE.items():
         st.session_state.profile.setdefault(k, v)
+if "diet_text" not in st.session_state:
+    st.session_state.diet_text = ""
 
-if "selected_exercises" not in st.session_state:
-    st.session_state.selected_exercises = []
+p = st.session_state.profile
+
+
+def last_detail(name):
+    items = load_json(WORKOUT_FILE)
+    items = sorted(items, key=lambda x: x.get("timestamp", x.get("date", "")), reverse=True)
+    for w in items:
+        for row in w.get("details") or []:
+            if row.get("name") == name and (row.get("sets") or row.get("weight")):
+                return row
+    return None
+
+
+def parts_of(ex_id=None, name=""):
+    found = list(ID_PARTS.get(ex_id or "", []))
+    return found or ["기타"]
 
 
 def week_workouts():
-    workouts = load_json(WORKOUT_FILE)
     today = date.today()
     out = []
-    for w in workouts:
+    for w in load_json(WORKOUT_FILE):
         try:
             d = datetime.strptime(w["date"], "%Y-%m-%d").date()
-            if d.isocalendar()[1] == today.isocalendar()[1] and d.year == today.year:
+            if d.isocalendar()[:2] == today.isocalendar()[:2]:
                 out.append(w)
         except Exception:
-            continue
+            pass
     return out
 
 
-def badge(ex):
-    if ex.get("shoulder_safe", True):
-        return '<span class="safe-tag">어깨 안전</span>'
-    return '<span class="caution-tag">어깨 주의</span>'
+def analyze_week():
+    counts = {k: 0 for k in PARTS}
+    for w in week_workouts():
+        ids = w.get("exercise_ids", [])
+        details = w.get("details") or [{"name": n} for n in w.get("exercises", [])]
+        for i, row in enumerate(details):
+            eid = ids[i] if i < len(ids) else None
+            for pt in parts_of(eid, row.get("name", "")):
+                if pt in counts:
+                    counts[pt] += 1
+    missing = [pt for pt in PARTS if counts[pt] == 0]
+    rec_map = {
+        "하체": "레그프레스, 루마니안 데드리프트, 레그컬",
+        "가슴": "인클라인 덤벨 프레스, 버터플라이",
+        "어깨": "사이드 레터럴, 페이스 풀 (가볍게)",
+        "등": "랫풀다운, 시티드 로우",
+        "팔": "이두 컬, 푸쉬업",
+        "코어": "플랭크",
+        "유산소": "트레드밀 경사 걷기 15~20분",
+    }
+    suggest = [f"{pt}: {rec_map[pt]}" for pt in missing if pt in rec_map]
+    n = len(week_workouts())
+    if n == 0:
+        summary = "이번 주 기록이 없습니다. 오늘 루틴부터 저장하세요."
+    elif n < 3:
+        summary = f"이번 주 {n}회. 주 3회가 최소입니다."
+    else:
+        summary = f"이번 주 {n}회. 횟수는 충분합니다."
+    return {"counts": counts, "missing": missing, "suggest": suggest, "summary": summary, "n": n}
 
 
-WEEKDAY_KR = ["월", "화", "수", "목", "금", "토", "일"]
+def render_ex(ex, prefix, hide_if_pain=False):
+    prev = last_detail(ex["name"])
+    label = ex["name"]
+    if not ex.get("shoulder_safe", True):
+        label += "  · 어깨주의"
+    done = st.checkbox(label, key=f"{prefix}_on_{ex['id']}")
+    st.caption(f"{ex['equipment']} · {ex['muscles']}")
+    if prev:
+        st.markdown(
+            f'<div class="prev">지난번 {prev.get("weight", 0)}kg · {prev.get("sets", 0)}세트 × {prev.get("reps", 0)}회. 같거나 조금만 올리세요.</div>',
+            unsafe_allow_html=True,
+        )
+    with st.expander("방법"):
+        st.write(ex["how_to"])
+        st.caption(ex["tip"])
+    dw = float(prev.get("weight", 0) or 0) if prev else 0.0
+    ds = int(prev.get("sets", 3) or 3) if prev else 0
+    dr = int(prev.get("reps", 10) or 10) if prev else 0
+    c1, c2, c3 = st.columns(3)
+    w = c1.number_input("무게 kg", 0.0, 400.0, dw, 2.5, key=f"{prefix}_w_{ex['id']}")
+    s = c2.number_input("세트", 0, 10, ds, key=f"{prefix}_s_{ex['id']}")
+    r = c3.number_input("횟수", 0, 50, dr, key=f"{prefix}_r_{ex['id']}")
+    return {
+        "id": ex["id"],
+        "name": ex["name"],
+        "done": bool(done or s > 0),
+        "weight": w,
+        "sets": int(s),
+        "reps": int(r),
+        "warmup": ex.get("category") == "워밍업 (어깨 필수)" or ex["id"].endswith("_wu") or ex["id"] in {
+            "arm_circle",
+            "scapular_pushup",
+            "band_er",
+            "face_pull_wu",
+        },
+        "caution": not ex.get("shoulder_safe", True),
+    }
 
-with st.sidebar:
-    st.markdown("## 💪 My Fit Planner")
-    st.caption("개인 전용 운동 플래너")
-    st.markdown("---")
-    menu = st.radio(
-        "메뉴",
-        [
-            "🏠 홈",
-            "📅 오늘의 추천 루틴",
-            "💪 운동 선택·체크",
-            "📋 운동 기록",
-            "📊 신체 기록",
-            "🍎 식단",
-            "🔥 운동 도감",
-            "⚙️ 설정",
-        ],
-        label_visibility="collapsed",
+
+def save_workout(rows, notes, plan="", require_warmup=False, pain=False):
+    logged = [r for r in rows if r["done"] or r["sets"] > 0]
+    if not logged:
+        st.warning("운동을 체크하거나 세트를 입력하세요.")
+        return
+    if require_warmup and not any(r["warmup"] and (r["done"] or r["sets"] > 0) for r in logged):
+        st.error("밀기 운동 전 워밍업을 하나 이상 체크하세요.")
+        return
+    if pain:
+        logged = [r for r in logged if not r.get("caution")]
+        notes = (("어깨 통증 있음. 주의 동작 제외. ") + (notes or "")).strip()
+    data = load_json(WORKOUT_FILE)
+    data.append(
+        {
+            "date": str(date.today()),
+            "plan": plan,
+            "exercises": [r["name"] for r in logged],
+            "exercise_ids": [r["id"] for r in logged],
+            "details": [
+                {"name": r["name"], "weight": r["weight"], "sets": r["sets"], "reps": r["reps"]}
+                for r in logged
+            ],
+            "notes": notes,
+            "timestamp": datetime.now().isoformat(),
+        }
     )
-    st.markdown("---")
-    p = st.session_state.profile
-    st.markdown(f"**목표**  체지방 {p['goal_fat']}%")
-    st.markdown(f"**현재**  {p['body_fat']}%")
-    span = max(0.1, 22.0 - float(p["goal_fat"]))
-    done = max(0.0, min(1.0, (22.0 - float(p["body_fat"])) / span))
-    st.progress(done)
-    st.caption(f"남은 체지방 약 {float(p['body_fat']) - float(p['goal_fat']):.1f}%p")
+    save_json(WORKOUT_FILE, data)
+    st.success("저장했습니다.")
+    st.rerun()
 
 
-if menu == "🏠 홈":
-    today = date.today()
-    rec = RECOMMENDED[today.weekday()]
-    st.markdown(f'<p class="main-header">안녕하세요, {p.get("name", "나")}님 👋</p>', unsafe_allow_html=True)
+today = date.today()
+rec = RECOMMENDED[today.weekday()]
+fb = analyze_week()
+push_day = "밀기" in rec["title"]
+
+page = st.radio(
+    "메뉴",
+    ["오늘", "운동선택", "피드백", "기록", "몸", "식단", "도감", "설정"],
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+if page == "오늘":
+    st.title("오늘")
     st.markdown(
-        f'<p class="sub-header">{today.strftime("%Y.%m.%d")} ({WEEKDAY_KR[today.weekday()]}) · 오늘 추천: {rec["title"]}</p>',
+        f'<div class="hint">{today.strftime("%m.%d")} ({WEEKDAY[today.weekday()]}) · {rec["title"]} · 이번 주 {fb["n"]}회</div>',
         unsafe_allow_html=True,
     )
+    a, b, c = st.columns(3)
+    a.metric("체중", f"{p['weight']}kg")
+    b.metric("체지방", f"{p['body_fat']}%")
+    c.metric("목표", f"{p['goal_fat']}%")
+    st.info(fb["summary"])
+    pain = st.checkbox("오늘 어깨가 불편하다")
+    if pain:
+        st.warning("벤치, 숄더프레스, 딥스는 건너뛰세요.")
 
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("체중", f"{p['weight']} kg")
-    c2.metric("체지방", f"{p['body_fat']}%")
-    c3.metric("목표까지", f"{float(p['body_fat']) - float(p['goal_fat']):.1f}%p")
-    this_week = week_workouts()
-    c4.metric("이번 주 운동", f"{len(this_week)}회")
-
-    if len(this_week) >= 3:
-        feedback = "이번 주 횟수가 충분합니다. 자세와 점진적 과부하만 챙기면 됩니다."
-    elif len(this_week) >= 1:
-        feedback = "좋습니다. 주 3회가 최소 목표입니다. 오늘 루틴을 하나 완료해보세요."
-    else:
-        feedback = "이번 주 기록이 아직 없습니다. 어깨 워밍업부터 가볍게 시작하세요."
-    st.markdown(f'<div class="feedback-box">{feedback}</div>', unsafe_allow_html=True)
-
-    st.info(
-        "회전근개 이력이 있으니 **밀기 운동 전 워밍업 10~15분**은 빼지 마세요. "
-        "통증이 있으면 그 동작은 건너뛰면 됩니다."
-    )
-
-    workouts = load_json(WORKOUT_FILE)
-    if workouts:
-        st.markdown("### 최근 운동")
-        for w in sorted(workouts, key=lambda x: x["date"], reverse=True)[:5]:
-            names = ", ".join(w.get("exercises", [])[:6])
-            extra = " ..." if len(w.get("exercises", [])) > 6 else ""
-            st.markdown(f"- **{w['date']}** · {names}{extra}")
-
-
-elif menu == "📅 오늘의 추천 루틴":
-    today = date.today()
-    rec = RECOMMENDED[today.weekday()]
-    st.markdown('<p class="main-header">오늘의 추천 루틴</p>', unsafe_allow_html=True)
-    st.markdown(
-        f'<p class="sub-header">{WEEKDAY_KR[today.weekday()]}요일 · {rec["title"]}</p>',
-        unsafe_allow_html=True,
-    )
-
-    if not rec["main"] and not rec["cardio"]:
-        st.success("오늘은 완전 휴식일입니다. 걷거나 스트레칭만 해도 충분합니다.")
-    else:
-        sections = [
-            ("1. 워밍업", rec["warmup"]),
-            ("2. 본 운동", rec["main"]),
-            ("3. 유산소 (선택)", rec["cardio"]),
-        ]
-        for title, ids in sections:
-            if not ids:
-                continue
-            st.markdown(f"### {title}")
-            for eid in ids:
-                ex = get_exercise_by_id(eid)
-                if not ex:
-                    continue
-                checked = st.checkbox(
-                    f"{ex['name']}  ({ex['equipment']})",
-                    key=f"rec_{eid}",
-                    value=eid in st.session_state.selected_exercises,
-                )
-                if checked and eid not in st.session_state.selected_exercises:
-                    st.session_state.selected_exercises.append(eid)
-                elif not checked and eid in st.session_state.selected_exercises:
-                    st.session_state.selected_exercises.remove(eid)
-                with st.expander("타겟 근육 · 방법 보기"):
-                    st.markdown(f"**타겟**  {ex['muscles']}")
-                    st.markdown(f"**방법**  {ex['how_to']}")
-                    st.markdown(f"**팁**  {ex['tip']}")
-                    st.markdown(badge(ex), unsafe_allow_html=True)
-
-        notes = st.text_area("오늘 메모 (무게/횟수/컨디션)", placeholder="예: 레그프레스 80kg 12x3, 어깨 컨디션 좋음")
-        if st.button("이 루틴 완료로 저장", type="primary", use_container_width=True):
-            names = []
-            for eid in st.session_state.selected_exercises:
-                ex = get_exercise_by_id(eid)
-                if ex:
-                    names.append(ex["name"])
-            if not names:
-                st.warning("체크한 운동이 없습니다.")
-            else:
-                workouts = load_json(WORKOUT_FILE)
-                workouts.append(
-                    {
-                        "date": str(today),
-                        "exercises": names,
-                        "exercise_ids": list(st.session_state.selected_exercises),
-                        "notes": notes,
-                        "plan": rec["title"],
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-                save_json(WORKOUT_FILE, workouts)
-                st.session_state.selected_exercises = []
-                st.success("저장했습니다. 수고했어요!")
-                st.rerun()
-
-
-elif menu == "💪 운동 선택·체크":
-    st.markdown('<p class="main-header">운동 선택 · 체크</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">헬스장에서 기구를 보고 골라 체크하면 됩니다.</p>', unsafe_allow_html=True)
-
-    cats = list(EXERCISES.keys())
-    selected_cat = st.selectbox("카테고리", ["전체"] + cats)
-    q = st.text_input("검색 (운동/기구 이름)", placeholder="예: 레그프레스, 덤벨, 랫풀다운")
-
-    items = get_all_exercises()
-    if selected_cat != "전체":
-        items = [e for e in items if e["category"] == selected_cat]
-    if q:
-        ql = q.lower()
-        items = [e for e in items if ql in e["name"].lower() or ql in e["equipment"].lower()]
-
-    for ex in items:
-        col_c, col_i = st.columns([0.08, 0.92])
-        with col_c:
-            checked = st.checkbox(
-                "선택",
-                key=f"chk_{ex['id']}",
-                value=ex["id"] in st.session_state.selected_exercises,
-                label_visibility="collapsed",
-            )
-            if checked and ex["id"] not in st.session_state.selected_exercises:
-                st.session_state.selected_exercises.append(ex["id"])
-            elif not checked and ex["id"] in st.session_state.selected_exercises:
-                st.session_state.selected_exercises.remove(ex["id"])
-        with col_i:
-            st.markdown(
-                f"**{ex['name']}**  {badge(ex)}  \n"
-                f"<span class='muscle-tag'>{ex['muscles']}</span>  \n"
-                f"기구: {ex['equipment']}",
-                unsafe_allow_html=True,
-            )
-            with st.expander("어떻게 하면 효과적일까?"):
-                st.markdown(f"**타겟 근육**  \n{ex['muscles']}")
-                st.markdown(f"**올바른 방법**  \n{ex['how_to']}")
-                st.markdown(f"**팁**  \n{ex['tip']}")
-
-    st.markdown("---")
-    if st.session_state.selected_exercises:
-        st.markdown("### 오늘 선택한 운동")
-        log_rows = []
-        for eid in st.session_state.selected_exercises:
+    rows = []
+    sections = [("워밍업", rec["warmup"]), ("본운동", rec["main"]), ("유산소 · 하나만", rec["cardio"])]
+    for title, ids in sections:
+        if not ids:
+            continue
+        st.subheader(title)
+        for eid in ids:
             ex = get_exercise_by_id(eid)
             if not ex:
                 continue
-            st.markdown(f"**{ex['name']}**")
-            c1, c2, c3 = st.columns(3)
-            w = c1.number_input("무게(kg)", 0.0, 500.0, 0.0, 2.5, key=f"w_{eid}")
-            s = c2.number_input("세트", 0, 10, 3, key=f"s_{eid}")
-            r = c3.number_input("횟수", 0, 50, 10, key=f"r_{eid}")
-            log_rows.append({"name": ex["name"], "weight": w, "sets": s, "reps": r})
+            if pain and not ex.get("shoulder_safe", True):
+                st.caption(f"{ex['name']} — 통증 있어 숨김")
+                continue
+            rows.append(render_ex(ex, title[:2]))
+            st.divider()
+    notes = st.text_input("메모")
+    if st.button("저장", type="primary", use_container_width=True):
+        save_workout(rows, notes, rec["title"], require_warmup=push_day, pain=pain)
 
-        notes = st.text_area("추가 메모")
-        if st.button("운동 완료로 저장하기", type="primary", use_container_width=True):
-            workouts = load_json(WORKOUT_FILE)
-            workouts.append(
-                {
-                    "date": str(date.today()),
-                    "exercises": [x["name"] for x in log_rows],
-                    "details": log_rows,
-                    "exercise_ids": list(st.session_state.selected_exercises),
-                    "notes": notes,
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-            save_json(WORKOUT_FILE, workouts)
-            st.session_state.selected_exercises = []
-            st.success("저장되었습니다!")
-            st.rerun()
+
+elif page == "운동선택":
+    st.title("운동 선택")
+    st.caption("부위 칸만 열면 됩니다. 화면을 가리는 왼쪽 메뉴는 제거했습니다.")
+    q = st.text_input("검색", placeholder="하체, 어깨, 랫풀다운")
+    rows = []
+    for cat, items in EXERCISES.items():
+        shown = items
+        if q:
+            ql = q.lower()
+            shown = [
+                e
+                for e in items
+                if ql in e["name"].lower()
+                or ql in e["equipment"].lower()
+                or ql in e["muscles"].lower()
+                or ql in cat.lower()
+            ]
+        if not shown:
+            continue
+        with st.expander(f"{cat} ({len(shown)})", expanded=bool(q)):
+            for ex in shown:
+                rows.append(render_ex(ex, "p" + cat[:2]))
+                st.divider()
+    notes = st.text_input("메모")
+    if st.button("저장", type="primary", use_container_width=True):
+        save_workout(rows, notes, "직접 선택")
+
+
+elif page == "피드백":
+    st.title("이번 주")
+    st.write(fb["summary"])
+    st.bar_chart(pd.DataFrame({"횟수": fb["counts"]}))
+    if fb["missing"]:
+        st.warning("빠진 부위: " + ", ".join(fb["missing"]))
+        st.subheader("다음 운동")
+        for s in fb["suggest"]:
+            st.write("· " + s)
     else:
-        st.info("위에서 오늘 할 운동을 선택하세요.")
+        st.success("주요 부위는 한 번씩 했습니다. 지난번 무게를 유지하거나 2.5kg만 올리세요.")
 
 
-elif menu == "📋 운동 기록":
-    st.markdown('<p class="main-header">운동 기록</p>', unsafe_allow_html=True)
+elif page == "기록":
+    st.title("기록")
     workouts = load_json(WORKOUT_FILE)
     if not workouts:
-        st.info("아직 기록이 없습니다. 오늘의 추천 루틴에서 시작해보세요.")
+        st.info("아직 없습니다.")
     else:
         for w in sorted(workouts, key=lambda x: x.get("timestamp", x["date"]), reverse=True):
-            title = f"📅 {w['date']} · {len(w.get('exercises', []))}개"
-            if w.get("plan"):
-                title += f" · {w['plan']}"
+            title = w["date"] + (f" · {w['plan']}" if w.get("plan") else "")
             with st.expander(title):
-                for name in w.get("exercises", []):
-                    st.markdown(f"- {name}")
                 if w.get("details"):
                     st.dataframe(pd.DataFrame(w["details"]), hide_index=True, use_container_width=True)
                 if w.get("notes"):
-                    st.markdown(f"**메모**  \n{w['notes']}")
-                if st.button("이 기록 삭제", key=f"del_{w.get('timestamp', w['date'])}"):
-                    left = [x for x in workouts if x.get("timestamp") != w.get("timestamp")]
-                    save_json(WORKOUT_FILE, left)
+                    st.caption(w["notes"])
+                if st.button("삭제", key="del_" + w.get("timestamp", w["date"])):
+                    save_json(
+                        WORKOUT_FILE,
+                        [x for x in workouts if x.get("timestamp") != w.get("timestamp")],
+                    )
                     st.rerun()
 
 
-elif menu == "📊 신체 기록":
-    st.markdown('<p class="main-header">신체 기록</p>', unsafe_allow_html=True)
+elif page == "몸":
+    st.title("몸")
     body_logs = load_json(BODY_FILE)
-    with st.form("body_form"):
+    with st.form("body"):
         c1, c2 = st.columns(2)
-        weight = c1.number_input("몸무게 (kg)", 40.0, 150.0, float(p["weight"]), 0.1)
-        body_fat = c2.number_input("체지방률 (%)", 5.0, 50.0, float(p["body_fat"]), 0.1)
-        memo = st.text_input("메모", placeholder="측정 장소, 컨디션 등")
-        if st.form_submit_button("기록 저장", type="primary"):
-            body_logs.append({"date": str(date.today()), "weight": weight, "body_fat": body_fat, "memo": memo})
+        weight = c1.number_input("몸무게 kg", 40.0, 150.0, float(p["weight"]), 0.1)
+        fat = c2.number_input("체지방 %", 5.0, 50.0, float(p["body_fat"]), 0.1)
+        if st.form_submit_button("저장", use_container_width=True):
+            body_logs.append({"date": str(today), "weight": weight, "body_fat": fat})
             save_json(BODY_FILE, body_logs)
-            st.session_state.profile["weight"] = weight
-            st.session_state.profile["body_fat"] = body_fat
+            st.session_state.profile.update({"weight": weight, "body_fat": fat})
             save_json(PROFILE_FILE, st.session_state.profile)
-            st.success("저장했습니다.")
             st.rerun()
-
     if body_logs:
         df = pd.DataFrame(body_logs).sort_values("date")
-        c1, c2 = st.columns(2)
-        c1.line_chart(df.set_index("date")["weight"], height=240)
-        c1.caption("몸무게")
-        c2.line_chart(df.set_index("date")["body_fat"], height=240)
-        c2.caption("체지방률")
-        st.dataframe(df.sort_values("date", ascending=False), use_container_width=True, hide_index=True)
+        st.line_chart(df.set_index("date")[["weight", "body_fat"]])
 
 
-elif menu == "🍎 식단":
-    st.markdown('<p class="main-header">식단 기록</p>', unsafe_allow_html=True)
-    target = int(p.get("protein_target", 120))
-    st.caption(f"목표 단백질 약 {target}g / 하루 (체중 67kg 기준 1.6~2.0g/kg)")
-    diet_logs = load_json(DIET_FILE)
-
-    with st.form("diet_form"):
-        meal = st.selectbox("끼니", ["아침", "점심", "저녁", "간식"])
-        content = st.text_area("내용", placeholder="예: 닭가슴살 200g, 밥, 채소")
-        protein = st.number_input("대략 단백질 (g)", 0, 200, 0)
-        if st.form_submit_button("저장", type="primary"):
-            diet_logs.append(
-                {
-                    "date": str(date.today()),
-                    "meal": meal,
-                    "content": content,
-                    "protein": protein,
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-            save_json(DIET_FILE, diet_logs)
-            st.success("저장했습니다.")
+elif page == "식단":
+    st.title("식단")
+    st.caption("자주 먹는 구성을 누르면 자동으로 채워집니다.")
+    cols = st.columns(len(MEALS))
+    for col, (label, text) in zip(cols, MEALS.items()):
+        if col.button(label, use_container_width=True):
+            st.session_state.diet_text = text
             st.rerun()
+    meal = st.selectbox("끼니", ["아침", "점심", "저녁", "간식"])
+    content = st.text_area("먹은 것", value=st.session_state.diet_text)
+    guess = estimate_meal(content) if content.strip() else {"kcal": 0, "protein": 0, "note": "적으면 대략 계산합니다."}
+    st.caption("추정 · " + guess["note"])
+    c1, c2 = st.columns(2)
+    protein = c1.number_input("단백질 g", 0, 250, int(guess["protein"]))
+    kcal = c2.number_input("칼로리 kcal", 0, 3000, int(guess["kcal"]))
+    if st.button("식단 저장", type="primary", use_container_width=True):
+        diet = load_json(DIET_FILE)
+        diet.append(
+            {
+                "date": str(today),
+                "meal": meal,
+                "content": content,
+                "protein": protein,
+                "kcal": kcal,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
+        save_json(DIET_FILE, diet)
+        st.session_state.diet_text = ""
+        st.success("저장했습니다.")
+        st.rerun()
+    diet = load_json(DIET_FILE)
+    today_diet = [d for d in diet if d["date"] == str(today)]
+    tp = sum(int(d.get("protein", 0) or 0) for d in today_diet)
+    tk = sum(int(d.get("kcal", 0) or 0) for d in today_diet)
+    m1, m2 = st.columns(2)
+    m1.metric("오늘 단백질", f"{tp}g / {int(p.get('protein_target', 120))}g")
+    m2.metric("오늘 칼로리", f"{tk}kcal / {int(p.get('kcal_target', 2000))}kcal")
+    for d in today_diet:
+        st.write(f"**{d['meal']}** · {d['content']} ({d.get('protein', 0)}g, {d.get('kcal', 0)}kcal)")
 
-    today_diet = [d for d in diet_logs if d["date"] == str(date.today())]
-    if today_diet:
-        st.markdown("### 오늘")
-        total = sum(int(d.get("protein", 0) or 0) for d in today_diet)
-        st.metric("오늘 대략 단백질", f"{total} g / {target} g")
-        st.progress(min(1.0, total / max(target, 1)))
-        for d in today_diet:
-            st.markdown(f"**{d['meal']}** · {d['content']} _(단백질 {d.get('protein', 0)}g)_")
 
-
-elif menu == "🔥 운동 도감":
-    st.markdown('<p class="main-header">운동 도감</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">기구를 보고 운동을 찾으면 됩니다.</p>', unsafe_allow_html=True)
-    search = st.text_input("검색", placeholder="예: 스미스, 덤벨, 랫풀다운")
-    all_ex = get_all_exercises()
-    if search:
-        sl = search.lower()
-        all_ex = [e for e in all_ex if sl in e["name"].lower() or sl in e["equipment"].lower() or sl in e["muscles"].lower()]
-
-    for cat in EXERCISES.keys():
-        cat_ex = [e for e in all_ex if e["category"] == cat]
-        if not cat_ex:
+elif page == "도감":
+    st.title("도감")
+    q = st.text_input("검색", placeholder="어깨, 스미스")
+    for cat, items in EXERCISES.items():
+        shown = items
+        if q:
+            ql = q.lower()
+            shown = [
+                e
+                for e in items
+                if ql in e["name"].lower() or ql in e["equipment"].lower() or ql in cat.lower()
+            ]
+        if not shown:
             continue
-        st.markdown(f"### {cat}")
-        for ex in cat_ex:
-            with st.expander(f"{ex['name']} · {ex['equipment']}"):
-                st.markdown(f"**타겟 근육**  \n{ex['muscles']}")
-                st.markdown(f"**사용 기구**  \n{ex['equipment']}")
-                st.markdown(f"**올바른 방법**  \n{ex['how_to']}")
-                st.markdown(f"**팁**  \n{ex['tip']}")
-                st.markdown(badge(ex), unsafe_allow_html=True)
+        with st.expander(f"{cat} ({len(shown)})"):
+            for ex in shown:
+                st.markdown(f"**{ex['name']}**")
+                st.caption(f"{ex['equipment']} · {ex['muscles']}")
+                st.write(ex["how_to"])
+                st.divider()
 
 
-elif menu == "⚙️ 설정":
-    st.markdown('<p class="main-header">설정</p>', unsafe_allow_html=True)
-    with st.form("profile_form"):
-        name = st.text_input("이름", value=str(p.get("name", "나")))
-        age = st.number_input("나이", 15, 80, int(p.get("age", 35)))
-        height = st.number_input("키 (cm)", 140, 220, int(p.get("height", 167)))
-        goal_fat = st.number_input("목표 체지방률 (%)", 8.0, 30.0, float(p.get("goal_fat", 15.0)), 0.5)
-        protein_target = st.number_input("하루 단백질 목표 (g)", 50, 250, int(p.get("protein_target", 120)))
-        if st.form_submit_button("저장", type="primary"):
+elif page == "설정":
+    st.title("설정")
+    st.caption("클라우드에선 기록이 사라질 수 있어 가끔 백업하세요.")
+    with st.form("prof"):
+        name = st.text_input("이름", p.get("name", "나"))
+        goal = st.number_input("목표 체지방 %", 8.0, 30.0, float(p.get("goal_fat", 15.0)), 0.5)
+        protein = st.number_input("단백질 목표 g", 50, 250, int(p.get("protein_target", 120)))
+        kcal_t = st.number_input("칼로리 목표", 1200, 4000, int(p.get("kcal_target", 2000)))
+        if st.form_submit_button("저장", use_container_width=True):
             st.session_state.profile.update(
-                {"name": name, "age": age, "height": height, "goal_fat": goal_fat, "protein_target": protein_target}
+                {"name": name, "goal_fat": goal, "protein_target": protein, "kcal_target": kcal_t}
             )
             save_json(PROFILE_FILE, st.session_state.profile)
             st.success("저장했습니다.")
-
-    st.markdown("### 데이터 내보내기")
-    st.caption("클라우드에 올리면 재시작 때 기록이 지워질 수 있습니다. 가끔 내보내기 하세요.")
     blob = json.dumps(
         {
             "profile": load_json(PROFILE_FILE, st.session_state.profile),
@@ -450,22 +478,4 @@ elif menu == "⚙️ 설정":
         ensure_ascii=False,
         indent=2,
     )
-    st.download_button("전체 기록 JSON 다운로드", blob, file_name="my_fit_backup.json", mime="application/json")
-
-    uploaded = st.file_uploader("백업 JSON 가져오기", type=["json"])
-    if uploaded and st.button("가져오기 적용"):
-        try:
-            data = json.load(uploaded)
-            if "profile" in data:
-                save_json(PROFILE_FILE, data["profile"])
-                st.session_state.profile = data["profile"]
-            if "workouts" in data:
-                save_json(WORKOUT_FILE, data["workouts"])
-            if "body" in data:
-                save_json(BODY_FILE, data["body"])
-            if "diet" in data:
-                save_json(DIET_FILE, data["diet"])
-            st.success("가져왔습니다.")
-            st.rerun()
-        except Exception:
-            st.error("파일 형식을 확인하세요.")
+    st.download_button("기록 백업 받기", blob, file_name="my_fit_backup.json")
