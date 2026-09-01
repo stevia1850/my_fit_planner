@@ -46,11 +46,17 @@
   .cal td.empty { background:transparent; border:0; }
   .sticky { position:sticky; bottom:12px; z-index:7; }
   .name { font-size:19px; font-weight:800; }
+  .banner { background:var(--green); color:#fff; border-radius:18px; padding:14px 16px; margin:8px 0 14px; }
+  .bar { height:10px; background:#e4ddd0; border-radius:99px; overflow:hidden; margin:8px 0 4px; }
+  .bar>i { display:block; height:100%; background:var(--green); }
+  .logline { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); font-size:16px; }
+  .logline:last-child { border-bottom:0; }
+  .dayhead { font-size:13px; letter-spacing:.08em; color:var(--muted); font-weight:800; margin:18px 0 6px; }
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="logo">MY FIT · 어깨야 미안</div>
+  <div class="logo">MY FIT · 버전 6 · 2026.09.01</div>
   <h1>오늘도 한 세트만</h1>
   <div class="sub" id="headSub"></div>
   <nav id="nav"></nav>
@@ -206,6 +212,15 @@ function estimate(text){
   return {items,kcal,protein,note:"문장 안에서 음식을 찾아 합산한 대략값입니다. 양에 따라 직접 수정하세요."};
 }
 function analyze(){const counts=Object.fromEntries(PARTS.map(p=>[p,0])); const thisWeek=workouts.filter(w=>sameWeek(new Date(w.date),today)); thisWeek.forEach(w=>(w.ids||[]).forEach(id=>{if(PART_MAP[id]) counts[PART_MAP[id]]++;})); return {n:thisWeek.length,counts,missing:PARTS.filter(p=>counts[p]===0)};}
+function uniqueDays(){return [...new Set(workouts.map(w=>w.date))].sort();}
+function streak(){
+  const set=new Set(uniqueDays());
+  let d=new Date(today), n=0;
+  if(!set.has(iso(d))) d.setDate(d.getDate()-1);
+  while(set.has(iso(d))){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function todayDone(){return workouts.some(w=>w.date===todayStr);}
 function sameWeek(a,b){const sa=new Date(a), sb=new Date(b); sa.setDate(sa.getDate()-((sa.getDay()+6)%7)); sb.setDate(sb.getDate()-((sb.getDay()+6)%7)); return iso(sa)===iso(sb);}
 function nav(){const pages=[["오늘","🏋️"],["달력","📅"],["운동선택","🧩"],["피드백","🧠"],["기록","📒"],["몸","🪞"],["식단","🍱"],["설정","🔧"]]; document.getElementById("nav").innerHTML=pages.map(([p,i])=>`<button class="${p===page?'on':''}" onclick="page='${p}';render()">${i} ${p}</button>`).join("");}
 function weekStrip(){return `<div class="week">${weekDates().map(d=>{const plan=PLAN[(d.getDay()+6)%7]; const has=workouts.some(w=>w.date===iso(d)); return `<div class="wday ${iso(d)===todayStr?'today':''} ${has?'done':''}"><b>${WD[(d.getDay()+6)%7]} ${d.getDate()}</b><div class="sub">${has?'기록됨':plan.title}</div></div>`;}).join("")}</div>`;}
@@ -273,12 +288,15 @@ function render(){
   if(page==="오늘"){
     const planned=[...plan.warmup,...plan.main,...plan.cardio];
     const extraIds=extras.ids.filter(id=>!planned.includes(id));
-    main.innerHTML=`<div class="grid4">
+    const goalN=3;
+    main.innerHTML=`<div class="banner">${todayDone()?"오늘 운동 기록됨. 무리하지 말고 단백질만 채우세요.":(plan.title.includes("휴식")?"오늘은 쉬는 날. 몸만 가볍게 움직이면 됩니다.":"헬스장 90분이면 충분합니다. 워밍업은 빼지 마세요.")}<div style="opacity:.85;margin-top:6px;font-size:14px">연속 ${streak()}일 · 이번 주 ${an.n}/${goalN}회</div></div>
+      <div class="grid4">
       <div class="metric"><span>체중</span><b>${profile.weight}kg</b></div>
       <div class="metric"><span>체지방</span><b>${profile.fat}%</b></div>
       <div class="metric"><span>8주</span><b>${profile.mid}%</b></div>
-      <div class="metric"><span>이번주</span><b>${an.n}회</b></div></div>
-      <p class="sub">2개월 ${profile.mid}% · 하루 ${profile.kcal}kcal / 단백질 ${profile.protein}g</p>
+      <div class="metric"><span>연속</span><b>${streak()}일</b></div></div>
+      <div class="bar"><i style="width:${Math.min(100,an.n/goalN*100)}%"></i></div>
+      <p class="sub">주 3회만 채워도 됩니다 · 하루 ${profile.kcal}kcal / 단백질 ${profile.protein}g</p>
       <h2>📅 이번 주</h2>${weekStrip()}
       <label><input id="pain" type="checkbox"> 오늘 어깨가 투정 부린다</label>
       ${["warmup","main","cardio"].map(sec=>{if(!plan[sec].length) return ""; const title=sec==="warmup"?"🌡️ 워밍업":sec==="main"?"🧱 본운동":"🏃 유산소 · 하나만"; return `<h2>${title}</h2>`+plan[sec].map(id=>exCard(id,sec)).join("");}).join("")}
@@ -303,9 +321,22 @@ function render(){
       +Object.entries(CATS).map(([c,ids])=>`<h2>${c}</h2>`+ids.map(id=>exCard(id,"pick")).join("")).join("")
       +`<button class="act sticky" onclick="addPicked()">선택한 운동 오늘에 넣기</button>`;
   } else if(page==="피드백"){
-    main.innerHTML=`<div class="card">이번 주 ${an.n}회 · ${an.missing.length?("빈칸: "+an.missing.join(", ")):"부위는 골고루 했습니다."}</div><table>${PARTS.map(p=>`<tr><td>${p}</td><td>${an.counts[p]}회</td></tr>`).join("")}</table>`;
+    main.innerHTML=`<div class="banner">이번 주 ${an.n}/3회 · 연속 ${streak()}일</div>
+      <p class="sub">${an.missing.length?("이번 주 빈칸: "+an.missing.join(", ")):"주요 부위는 한 번씩 했습니다."}</p>
+      ${PARTS.map(p=>`<div class="logline"><span>${p}</span><b>${an.counts[p]}회</b></div>`).join("")}`;
   } else if(page==="기록"){
-    main.innerHTML=workouts.slice().reverse().map(w=>`<div class="card"><div class="name">${w.date} · ${w.plan||""}</div>${(w.details||[]).map(d=>`<div>${d.name} · ${(d.sets||[]).map(s=>s.w+"kg × "+s.r).join(" / ")}</div>`).join("")}<button class="ghost" onclick="delW('${w.ts}')">삭제</button></div>`).join("")||"<p>아직 기록이 없습니다.</p>";
+    const days=[...new Set([...workouts.map(w=>w.date),...diet.map(d=>d.date)])].sort().reverse();
+    main.innerHTML=`<div class="banner">운동 ${uniqueDays().length}일 · 식단 ${[...new Set(diet.map(d=>d.date))].length}일</div>`+(
+      days.length? days.map(day=>{
+        const ws=workouts.filter(w=>w.date===day);
+        const ds=diet.filter(x=>x.date===day);
+        const wd=WD[(new Date(day+"T00:00:00").getDay()+6)%7];
+        return `<div class="dayhead">${day} (${wd})</div><div class="card">
+          ${ws.map(w=>`<div class="name">${w.plan||"운동"}</div>${(w.details||[]).map(d=>`<div class="logline"><span>${d.name}</span><b>${(d.sets||[]).map(s=>s.w+"×"+s.r).join("  ")}</b></div>`).join("")}${w.note?`<p class="sub">${w.note}</p>`:""}<button class="ghost" onclick="delW('${w.ts}')">이 운동 삭제</button>`).join("")||'<p class="sub">운동 없음</p>'}
+          ${ds.map(d=>`<div class="logline"><span>${d.meal} · ${d.content}</span><b>${d.protein}g / ${d.kcal}</b></div>`).join("")}
+        </div>`;
+      }).join("") : "<div class='card'>아직 기록이 없습니다. 오늘 운동만 저장해도 여기가 채워집니다.</div>"
+    );
   } else if(page==="몸"){
     main.innerHTML=`<div class="row"><input id="bw" type="number" step="0.1" value="${profile.weight}"><input id="bf" type="number" step="0.1" value="${profile.fat}"></div><button class="act" onclick="saveBody()">신체 저장</button><table>${body.slice().reverse().map(b=>`<tr><td>${b.date}</td><td>${b.weight}kg</td><td>${b.fat}%</td></tr>`).join("")}</table>`;
   } else if(page==="식단"){
@@ -335,7 +366,7 @@ function drawDiet(){
   const p=list.reduce((a,b)=>a+(+b.protein||0),0), k=list.reduce((a,b)=>a+(+b.kcal||0),0);
   document.getElementById("dtoday").innerHTML=`<p><b>합계 ${p}g / ${k}kcal</b></p>`+list.map(d=>`<div class="card">${d.meal} · ${d.content}<div class="sub">${d.protein}g / ${d.kcal}kcal</div><button class="ghost" onclick="delDiet('${d.ts}')">삭제</button></div>`).join("");
 }
-function saveToday(){const pain=document.getElementById("pain")?.checked; let rows=collect(); const plan=PLAN[(today.getDay()+6)%7]; if(plan.title.includes("밀기")&&!rows.some(r=>["arm_circle","scapular_pushup","band_er","face_pull_wu"].includes(r.id))){alert("밀기 날엔 워밍업을 남기세요.");return;} if(pain) rows=rows.filter(r=>r.safe); if(!rows.length){alert("운동을 입력하세요");return;} workouts.push({date:todayStr,ts:Date.now(),plan:plan.title,ids:rows.map(r=>r.id),names:rows.map(r=>r.name),details:rows,note:document.getElementById("note")?.value||""}); save("mf_workouts",workouts); extras.ids=[]; save("mf_extras",extras); alert("저장했습니다"); page="기록"; render();}
+function saveToday(){const pain=document.getElementById("pain")?.checked; let rows=collect(); const plan=PLAN[(today.getDay()+6)%7]; if(plan.title.includes("밀기")&&!rows.some(r=>["arm_circle","scapular_pushup","band_er","face_pull_wu"].includes(r.id))){alert("밀기 날엔 워밍업을 남기세요.");return;} if(pain) rows=rows.filter(r=>r.safe); if(!rows.length){alert("운동을 입력하세요");return;} workouts.push({date:todayStr,ts:Date.now(),plan:plan.title,ids:rows.map(r=>r.id),names:rows.map(r=>r.name),details:rows,note:document.getElementById("note")?.value||""}); save("mf_workouts",workouts); extras.ids=[]; save("mf_extras",extras); alert("저장했습니다. 연속 "+streak()+"일"); page="오늘"; render();}
 function delW(ts){workouts=workouts.filter(w=>String(w.ts)!==String(ts)); save("mf_workouts",workouts); render();}
 function saveBody(){profile.weight=+document.getElementById("bw").value; profile.fat=+document.getElementById("bf").value; body.push({date:todayStr,weight:profile.weight,fat:profile.fat}); save("mf_profile",profile); save("mf_body",body); render();}
 function saveDiet(){const g=estimate(document.getElementById("food").value); const protein=+(document.getElementById("protEdit").value||g.protein); const kcal=+(document.getElementById("kcalEdit").value||g.kcal); diet.push({ts:Date.now(),date:todayStr,meal:document.getElementById("meal").value,content:document.getElementById("food").value,protein,kcal}); save("mf_diet",diet); render();}
