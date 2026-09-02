@@ -52,11 +52,15 @@
   .logline { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); font-size:16px; }
   .logline:last-child { border-bottom:0; }
   .dayhead { font-size:13px; letter-spacing:.08em; color:var(--muted); font-weight:800; margin:18px 0 6px; }
+  .bodywrap { display:flex; gap:10px; align-items:flex-end; margin:10px 0; }
+  .bodyfig { background:#1c2220; border-radius:14px; padding:8px 10px 6px; text-align:center; }
+  .bodyfig svg { width:86px; height:150px; display:block; }
+  .bodyfig small { color:#c8d0cb; font-size:11px; }
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="logo">MY FIT · 버전 6 · 2026.09.01</div>
+  <div class="logo">MY FIT · 버전 7 · 2026.09.02</div>
   <h1>오늘도 한 세트만</h1>
   <div class="sub" id="headSub"></div>
   <nav id="nav"></nav>
@@ -221,6 +225,54 @@ function streak(){
   return n;
 }
 function todayDone(){return workouts.some(w=>w.date===todayStr);}
+const HIT={
+arm_circle:["front_delt","side_delt"],scapular_pushup:["core","chest"],band_er:["rear_delt"],face_pull_wu:["rear_delt","midback"],
+leg_press:["quads","glutes"],squat_machine:["quads","glutes"],rdl:["hams","glutes"],leg_extension:["quads"],leg_curl:["hams"],
+dumbbell_lunge:["quads","glutes"],calf_raise:["calves"],bench_press:["chest","triceps","front_delt"],
+incline_dumbbell_press:["chest","front_delt"],pec_deck:["chest"],shoulder_press_machine:["front_delt","side_delt"],
+lateral_raise:["side_delt"],dips:["triceps","chest"],pushup:["chest","triceps","core"],
+lat_pulldown:["lats","biceps"],pullup:["lats","biceps"],seated_row:["midback","lats"],dumbbell_row:["lats","midback"],
+face_pull:["rear_delt","midback"],bicep_curl:["biceps"],treadmill_walk:["quads","calves"],treadmill:["quads","calves"],
+stair_climber:["glutes","quads"],rowing:["midback","lats","hams"],plank:["core"],dead_bug:["core"]
+};
+const HINT={
+leg_press:"발 낮으면 허벅지, 높으면 엉덩이",
+squat_machine:"발 좁고 앞이면 허벅지, 넓고 뒤면 엉덩이",
+rdl:"무릎을 덜 굽히면 햄스트링·엉덩이",
+incline_dumbbell_press:"각도가 높을수록 윗가슴·앞어깨"
+};
+function on(list,key){return list.includes(key)?"#ff7a2f":"#4a5550";}
+function bodyMap(id){
+  const h=HIT[id]||[];
+  return `<div class="bodywrap">
+    <div class="bodyfig"><svg viewBox="0 0 80 150">${/* front */""}
+      <ellipse cx="40" cy="12" rx="10" ry="11" fill="#5b6560"/>
+      <rect x="28" y="22" width="24" height="10" rx="4" fill="${on(h,"front_delt")}"/>
+      <rect x="18" y="26" width="12" height="28" rx="6" fill="${on(h,"biceps")}"/>
+      <rect x="50" y="26" width="12" height="28" rx="6" fill="${on(h,"biceps")}"/>
+      <rect x="30" y="32" width="20" height="22" rx="6" fill="${on(h,"chest")}"/>
+      <rect x="32" y="54" width="16" height="16" rx="5" fill="${on(h,"core")}"/>
+      <rect x="24" y="70" width="14" height="36" rx="7" fill="${on(h,"quads")}"/>
+      <rect x="42" y="70" width="14" height="36" rx="7" fill="${on(h,"quads")}"/>
+      <rect x="25" y="106" width="12" height="28" rx="6" fill="${on(h,"calves")}"/>
+      <rect x="43" y="106" width="12" height="28" rx="6" fill="${on(h,"calves")}"/>
+    </svg><small>앞</small></div>
+    <div class="bodyfig"><svg viewBox="0 0 80 150">
+      <ellipse cx="40" cy="12" rx="10" ry="11" fill="#5b6560"/>
+      <rect x="28" y="22" width="24" height="10" rx="4" fill="${on(h,"rear_delt")}"/>
+      <rect x="18" y="26" width="12" height="28" rx="6" fill="${on(h,"triceps")}"/>
+      <rect x="50" y="26" width="12" height="28" rx="6" fill="${on(h,"triceps")}"/>
+      <rect x="30" y="32" width="20" height="24" rx="6" fill="${on(h,"lats")}"/>
+      <rect x="33" y="40" width="14" height="14" rx="4" fill="${on(h,"midback")}"/>
+      <rect x="28" y="66" width="24" height="16" rx="7" fill="${on(h,"glutes")}"/>
+      <rect x="24" y="82" width="14" height="24" rx="7" fill="${on(h,"hams")}"/>
+      <rect x="42" y="82" width="14" height="24" rx="7" fill="${on(h,"hams")}"/>
+      <rect x="25" y="106" width="12" height="28" rx="6" fill="${on(h,"calves")}"/>
+      <rect x="43" y="106" width="12" height="28" rx="6" fill="${on(h,"calves")}"/>
+    </svg><small>뒤</small></div>
+    <div class="sub">${(h.length? "주황 = 자극 부위":"")}${HINT[id]?"<br>"+HINT[id]:""}</div>
+  </div>`;
+}
 function sameWeek(a,b){const sa=new Date(a), sb=new Date(b); sa.setDate(sa.getDate()-((sa.getDay()+6)%7)); sb.setDate(sb.getDate()-((sb.getDay()+6)%7)); return iso(sa)===iso(sb);}
 function nav(){const pages=[["오늘","🏋️"],["달력","📅"],["운동선택","🧩"],["피드백","🧠"],["기록","📒"],["몸","🪞"],["식단","🍱"],["설정","🔧"]]; document.getElementById("nav").innerHTML=pages.map(([p,i])=>`<button class="${p===page?'on':''}" onclick="page='${p}';render()">${i} ${p}</button>`).join("");}
 function weekStrip(){return `<div class="week">${weekDates().map(d=>{const plan=PLAN[(d.getDay()+6)%7]; const has=workouts.some(w=>w.date===iso(d)); return `<div class="wday ${iso(d)===todayStr?'today':''} ${has?'done':''}"><b>${WD[(d.getDay()+6)%7]} ${d.getDate()}</b><div class="sub">${has?'기록됨':plan.title}</div></div>`;}).join("")}</div>`;}
@@ -260,6 +312,7 @@ function exCard(id,prefix){
     <div class="sub">${eq} · ${mus}</div>
     <span class="chip">추천 ${rx.t}</span>
     ${prev?`<span class="chip">지난번 ${(prev.sets||[]).map(s=>s.w+'kg × '+s.r).join(' / ')}</span>`:""}
+    ${bodyMap(id)}
     <details><summary>방법</summary><p>${how}</p></details>
     ${prefix==="pick"?pick:`${pick}<div class="setbox">${rows}</div>${rm}`}
   </div>`;
